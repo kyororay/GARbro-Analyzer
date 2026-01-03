@@ -1,4 +1,4 @@
-GARbro
+GARbro-Analyzer
 ======
 
 鍵データ解析用
