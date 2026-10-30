@@ -281,33 +281,46 @@ namespace GameRes.Formats.KiriKiri
                     var prolog_list = GetPermutation(Enumerable.Range(0, 3).Select(i => (byte)i));
                     var odd_list = GetPermutation(Enumerable.Range(0, 6).Select(i => (byte)i));
                     var even_list = GetPermutation(Enumerable.Range(0, 8).Select(i => (byte)i));
+                    var total_count = prolog_list.Count() * odd_list.Count() * even_list.Count();
+                    int current_count = 0;
+                    double progress = 0.0;
 
-                    foreach (var prolog in prolog_list)
+                    var arc_dir = VFS.GetDirectoryName(VFS.CurrentArchive.File.Name);
+                    using (var sw = new StreamWriter(arc_dir + "\\order.txt", true, Encoding.GetEncoding("Shift_JIS")))
                     {
-                        PrologOrder = prolog;
-                        foreach (var odd in odd_list)
+                        foreach (var prolog in prolog_list)
                         {
-                            OddBranchOrder = odd;
-                            foreach (var even in even_list)
+                            PrologOrder = prolog;
+                            foreach (var odd in odd_list)
                             {
-                                EvenBranchOrder = even;
-                                var program = NewProgram(seed);
-                                for (int stage = 5; stage > 0; --stage)
+                                OddBranchOrder = odd;
+                                foreach (var even in even_list)
                                 {
-                                    m_order_text = "";
-                                    if (EmitCode(program, stage))
+                                    if (current_count % 1000000 == 0)
                                     {
-                                        //if (KeyAnalyze.OederText.Contains(m_order_text))
-                                        if (m_order_text == KeyAnalyze.OederText)
-                                            Trace.WriteLine(String.Format(
-                                                "{0}\t{1}\t{2}",
-                                                String.Join(",", PrologOrder),
-                                                String.Join(",", OddBranchOrder),
-                                                String.Join(",", EvenBranchOrder)
-                                                ));
-                                        break;
+                                        progress = (double)current_count / (double)total_count;
+                                        Console.WriteLine("‰ðÍ’†: {0}%", progress.ToString("F2"));
                                     }
-                                    program.Clear();
+                                    EvenBranchOrder = even;
+                                    var program = NewProgram(seed);
+                                    for (int stage = 5; stage > 0; --stage)
+                                    {
+                                        m_order_text = "";
+                                        if (EmitCode(program, stage))
+                                        {
+                                            //if (KeyAnalyze.OederText.Contains(m_order_text))
+                                            if (m_order_text == KeyAnalyze.OederText)
+                                                sw.WriteLine(String.Format(
+                                                    "{0}_{1}_{2}",
+                                                    String.Join(",", PrologOrder),
+                                                    String.Join(",", OddBranchOrder),
+                                                    String.Join(",", EvenBranchOrder)
+                                                    ));
+                                            break;
+                                        }
+                                        program.Clear();
+                                    }
+                                    current_count++;
                                 }
                             }
                         }

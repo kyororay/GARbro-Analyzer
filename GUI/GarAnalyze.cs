@@ -10,7 +10,7 @@ namespace GARbro.GUI
 
         //Kirikiri.CxEncription
         public static string AnalyzeFile = "startup.tjs"; //解析対象
-        public static string OederText = "P0P2O5E6P0P0O3E2O3P1P2O3E5E0O4"; //期待されるコード文字列
+        public static string OederText = "P1E6P0E2O5P2P1O2P1E2O1O5"; //期待されるコード文字列
         public static byte[] PrologOrder;
         public static byte[] OddBranchOrder;
         public static byte[] EvenBranchOrder;
