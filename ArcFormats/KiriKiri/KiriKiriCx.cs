@@ -25,6 +25,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -34,7 +35,10 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
+using System.Windows.Threading;
 using GARbro.GUI;
+using GARbro.GUI.Strings;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace GameRes.Formats.KiriKiri
 {
@@ -269,6 +273,8 @@ namespace GameRes.Formats.KiriKiri
         private static string m_order_text = "";
         private static string m_analyze_file = "";
         internal static int m_select_count = 0;
+        private static uint Seed = 0;
+        private static ProgressDialog m_progress_dialog;
 
         CxProgram GenerateProgram(uint seed) //OrderâêÕóp
         {
@@ -278,57 +284,16 @@ namespace GameRes.Formats.KiriKiri
             {
                 if (m_analyze_file == KeyAnalyze.AnalyzeFile && m_select_count >= 2)
                 {
-                    var prolog_list = GetPermutation(Enumerable.Range(0, 3).Select(i => (byte)i));
-                    var odd_list = GetPermutation(Enumerable.Range(0, 6).Select(i => (byte)i));
-                    var even_list = GetPermutation(Enumerable.Range(0, 8).Select(i => (byte)i));
-                    var total_count = prolog_list.Count() * odd_list.Count() * even_list.Count();
-                    int current_count = 0;
-                    double progress = 0.0;
-
-                    var arc_dir = VFS.GetDirectoryName(VFS.CurrentArchive.File.Name);
-                    using (var sw = new StreamWriter(arc_dir + "\\order.txt", true, Encoding.GetEncoding("Shift_JIS")))
+                    Seed = seed;
+                    m_progress_dialog = new ProgressDialog()
                     {
-                        foreach (var prolog in prolog_list)
-                        {
-                            PrologOrder = prolog;
-                            foreach (var odd in odd_list)
-                            {
-                                OddBranchOrder = odd;
-                                foreach (var even in even_list)
-                                {
-                                    if (current_count % 1000000 == 0)
-                                    {
-                                        progress = (double)current_count / (double)total_count;
-                                        Console.WriteLine("âêÕíÜ: {0}%", progress.ToString("F2"));
-                                    }
-                                    EvenBranchOrder = even;
-                                    var program = NewProgram(seed);
-                                    for (int stage = 5; stage > 0; --stage)
-                                    {
-                                        m_order_text = "";
-                                        if (EmitCode(program, stage))
-                                        {
-                                            //if (KeyAnalyze.OederText.Contains(m_order_text))
-                                            if (m_order_text == KeyAnalyze.OederText)
-                                                sw.WriteLine(String.Format(
-                                                    "{0}_{1}_{2}",
-                                                    String.Join(",", PrologOrder),
-                                                    String.Join(",", OddBranchOrder),
-                                                    String.Join(",", EvenBranchOrder)
-                                                    ));
-                                            break;
-                                        }
-                                        program.Clear();
-                                    }
-                                    current_count++;
-                                }
-                            }
-                        }
-                    }
-                    System.Windows.Application.Current.MainWindow.Activate();
-                    System.Windows.Application.Current.MainWindow.Topmost = true;
-                    System.Windows.Application.Current.MainWindow.Topmost = false;
-                    System.Windows.MessageBox.Show("OrderÇÃâêÕÇ™äÆóπÇµÇ‹ÇµÇΩ", "í ím");
+                        WindowTitle = "âêÕíÜ",
+                        Text = "",
+                        Description = "",
+                    };
+                    m_progress_dialog.DoWork += progress_dialog_DoWork;
+                    m_progress_dialog.RunWorkerCompleted += OnAnalyzeComplete;
+                    m_progress_dialog.ShowDialog();
                 }
                 else
                 {
@@ -350,6 +315,69 @@ namespace GameRes.Formats.KiriKiri
                 Console.WriteLine(e.StackTrace);
             }
             throw new CxProgramException("Overly large CxEncryption bytecode");
+        }
+
+        private void progress_dialog_DoWork(object sender, DoWorkEventArgs e)
+        {
+            var prolog_list = GetPermutation(Enumerable.Range(0, 3).Select(i => (byte)i));
+            var odd_list = GetPermutation(Enumerable.Range(0, 6).Select(i => (byte)i));
+            var even_list = GetPermutation(Enumerable.Range(0, 8).Select(i => (byte)i));
+            var total_count = prolog_list.Count() * odd_list.Count() * even_list.Count();
+            int current_count = 0;
+            double progress_count = 0.0;
+
+            var arc_dir = VFS.GetDirectoryName(VFS.CurrentArchive.File.Name);
+            using (var sw = new StreamWriter(arc_dir + "\\key.txt", true, Encoding.GetEncoding("Shift_JIS")))
+            {
+                foreach (var prolog in prolog_list)
+                {
+                    PrologOrder = prolog;
+                    foreach (var odd in odd_list)
+                    {
+                        OddBranchOrder = odd;
+                        foreach (var even in even_list)
+                        {
+                            if (m_progress_dialog.CancellationPending)
+                            {
+                                return;
+                            }
+                            if (current_count % 100000 == 0)
+                            {
+                                progress_count = (double)current_count / (double)total_count * 100;
+                                m_progress_dialog.ReportProgress((int)progress_count, null, $"{progress_count.ToString("F2")}%");
+                            }
+                            EvenBranchOrder = even;
+                            var program = NewProgram(Seed);
+                            for (int stage = 5; stage > 0; --stage)
+                            {
+                                m_order_text = "";
+                                if (EmitCode(program, stage))
+                                {
+                                    //if (KeyAnalyze.OederText.Contains(m_order_text))
+                                    if (m_order_text == KeyAnalyze.OederText)
+                                        sw.WriteLine(String.Format(
+                                            "{0}_{1}_{2}",
+                                            String.Join(",", PrologOrder),
+                                            String.Join(",", OddBranchOrder),
+                                            String.Join(",", EvenBranchOrder)
+                                            ));
+                                    break;
+                                }
+                                program.Clear();
+                            }
+                            current_count++;
+                        }
+                    }
+                }
+            }
+        }
+
+        void OnAnalyzeComplete(object sender, RunWorkerCompletedEventArgs e)
+        {
+            System.Windows.Application.Current.MainWindow.Activate();
+            System.Windows.Application.Current.MainWindow.Topmost = true;
+            System.Windows.Application.Current.MainWindow.Topmost = false;
+            System.Windows.MessageBox.Show("OrderÇÃâêÕÇ™äÆóπÇµÇ‹ÇµÇΩ", "í ím");
         }
 
         public static IEnumerable<T[]> GetPermutation<T>(IEnumerable<T> collection)

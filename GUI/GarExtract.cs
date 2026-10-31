@@ -404,7 +404,7 @@ namespace GARbro.GUI
             {
                 try
                 {
-                    var key_parts = key.Split('\t');
+                    var key_parts = key.Split('_');
                     KeyAnalyze.PrologOrder = key_parts[0].Split(',').Select(i => byte.Parse(i)).ToArray();
                     KeyAnalyze.OddBranchOrder = key_parts[1].Split(',').Select(i => byte.Parse(i)).ToArray();
                     KeyAnalyze.EvenBranchOrder = key_parts[2].Split(',').Select(i => byte.Parse(i)).ToArray();
@@ -413,7 +413,10 @@ namespace GARbro.GUI
                         
                         PrepareDestination(m_destination);
                         string target_ext = target_format.Extensions.FirstOrDefault() ?? ""; //ƒsƒŠƒIƒh–³‚µ
-                        string outname = "P" + String.Join("", KeyAnalyze.PrologOrder) + "O" + String.Join("", KeyAnalyze.OddBranchOrder) + "E" + String.Join("", KeyAnalyze.EvenBranchOrder) + "." + target_ext;
+                        string outname = 
+                            String.Join(",", KeyAnalyze.PrologOrder) + "_" + 
+                            String.Join(",", KeyAnalyze.OddBranchOrder) + "_" + 
+                            String.Join(",", KeyAnalyze.EvenBranchOrder) + "." + target_ext;
 
                         using (var outfile = CreateNewFile(outname, true))
                         {
